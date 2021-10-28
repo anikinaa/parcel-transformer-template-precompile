@@ -1,19 +1,34 @@
-const Handlebars = require('handlebars');
 const { Transformer } = require('@parcel/plugin');
 
 const transformer = new Transformer({
     async transform({asset}) {
-        const source = await asset.getCode();
-        const precompiled = Handlebars.precompile(source);
-        const js = `
-                import Handlebars from 'handlebars/dist/handlebars.runtime';
-                const templateFunction = Handlebars.template(${precompiled});
-                export default templateFunction;
-                `;
+        let templdate = await asset.getCode();
+        let key = null;
+        const regExp = /\{\{\{(.*?)\}\}\}/gi;
+
+        while ((key = regExp.exec(templdate))) {
+            if (key[1]) {
+                const contextKey = key[1].trim();
+                const templateEl = getTemplate(contextKey)
+                templdate = templdate.replace(new RegExp(key[0], "gi"), templateEl);
+            }
+        }
+
+        const newCode = `
+        const template = \`
+        ${templdate}
+        \`;
+        export default template;
+        `;
         asset.type = 'js';
-        asset.setCode(js);
+        asset.setCode(newCode);
         return [asset];
     }
 });
+
+
+function getTemplate(contextKey) {
+    return `<template data-context="${contextKey}"></template>`
+}
 
 module.exports = transformer;
